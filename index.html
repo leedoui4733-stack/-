@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Slime Eat Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      overflow: hidden;
+      color: white;
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+    }
+
+    #player {
+      width: 60px;
+      height: 60px;
+      background: rgb(200, 50, 205);
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 10px;
+      display: none; /* 시작 전 숨김 */
+    }
+
+    .slime {
+      width: 40px;
+      height: 40px;
+      position: absolute;
+      top: -50px;
+    }
+
+    .slime.green { background: #66ffcc; border-radius: 50%; }
+    .slime.red { background: #ff6666; border-radius: 50%; }
+    .slime.blue { background: #6666ff; border-radius: 40% 60% 60% 40%; }
+    .slime.yellow { background: #ffff66; border-radius: 30% 70% 50% 50%; }
+
+    .star {
+      width: 30px;
+      height: 30px;
+      background: yellow;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      position: absolute;
+      top: -50px;
+    }
+
+    #score {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      display: none;
+    }
+
+    #hp-container {
+      position: absolute;
+      top: 60px;
+      left: 20px;
+      display: flex;
+      gap: 5px;
+      display: none;
+    }
+
+    .heart {
+      width: 30px;
+      height: 30px;
+      background: red;
+      clip-path: path("M24.97 4.15c-2.64-2.63-6.92-2.63-9.56 0l-.91.9-.9-.9C10.97 1.52 6.7 1.52 4.06 4.15c-2.82 2.82-2.82 7.4 0 10.22l.9.9 9.56 9.56 9.56-9.56.9-.9c2.63-2.82 2.63-7.4-.01-10.22z");
+    }
+
+    .heart.half { background: linear-gradient(to right, red 50%, #444 50%); }
+    .heart.empty { background: #444; }
+
+    #gameover {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+      font-size: 48px;
+      display: none;
+    }
+
+    #retry {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 24px;
+      cursor: pointer;
+      background: #ff5555;
+      border: none;
+      border-radius: 10px;
+      color: white;
+    }
+
+    /* 시작 화면 */
+    #start-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+    }
+
+    #start-btn {
+      margin-top: 20px;
+      padding: 15px 30px;
+      font-size: 28px;
+      cursor: pointer;
+      background: #55ff55;
+      border: none;
+      border-radius: 10px;
+      color: #222;
+    }
+
+    #instructions {
+      margin-top: 20px;
+      font-size: 20px;
+      text-align: center;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<div id="start-screen">
+  <div style="font-size:48px; font-weight:bold;">Slime Eat Game</div>
+  <button id="start-btn">게임 시작</button>
+  <div id="instructions">
+    마우스로 플레이어를 움직여 재명이를 먹으세요!<br>
+    슬라임을 놓치면 체력이 줄어듭니다.<br>
+    별을 먹으면 체력이 0.5 회복됩니다.<br>
+    체력이 0이 되면 드럼통!
+  </div>
+</div>
+
+<div id="player"></div>
+<div id="score">점수: 0</div>
+<div id="hp-container"></div>
+
+<div id="gameover">
+  <div id="gameover-text">드럼통!</div>
+  <button id="retry">다시 시작</button>
+</div>
+
+<script>
+  const player = document.getElementById("player");
+  const scoreText = document.getElementById("score");
+  const hpContainer = document.getElementById("hp-container");
+  const gameoverScreen = document.getElementById("gameover");
+  const retryBtn = document.getElementById("retry");
+  const startScreen = document.getElementById("start-screen");
+  const startBtn = document.getElementById("start-btn");
+
+  let playerX = window.innerWidth / 2;
+  let score = 0;
+  let hpHalf = 10; // 5칸 → 반칸 10개
+  let gameIntervalSlime, gameIntervalStar;
+
+  function updateHearts() {
+    hpContainer.innerHTML = "";
+    for (let i = 0; i < 5; i++) {
+      const heart = document.createElement("div");
+      heart.classList.add("heart");
+      if (hpHalf >= (i + 1) * 2) {} 
+      else if (hpHalf === (i * 2) + 1) { heart.classList.add("half"); }
+      else { heart.classList.add("empty"); }
+      hpContainer.appendChild(heart);
+    }
+  }
+
+  function startGame() {
+    startScreen.style.display = "none";
+    player.style.display = "block";
+    scoreText.style.display = "block";
+    hpContainer.style.display = "flex";
+
+    updateHearts();
+    gameIntervalSlime = setInterval(spawnSlime, 800);
+    gameIntervalStar = setInterval(spawnStar, 5000);
+  }
+
+  startBtn.onclick = startGame;
+
+  document.addEventListener("mousemove", e => {
+    playerX = e.clientX;
+    player.style.left = playerX - player.offsetWidth / 2 + "px";
+  });
+
+  function gameOver() {
+    gameoverScreen.style.display = "flex";
+    clearInterval(gameIntervalSlime);
+    clearInterval(gameIntervalStar);
+  }
+
+  retryBtn.onclick = () => location.reload();
+
+  function spawnSlime() {
+    const slime = document.createElement("div");
+    slime.classList.add("slime");
+    const types = ["green", "red", "blue", "yellow"];
+    slime.classList.add(types[Math.floor(Math.random()*types.length)]);
+    slime.style.left = Math.random()*(window.innerWidth-40) + "px";
+    document.body.appendChild(slime);
+
+    let slimeY = -50;
+    const fall = setInterval(() => {
+      slimeY += 4;
+      slime.style.top = slimeY + "px";
+
+      const pRect = player.getBoundingClientRect();
+      const sRect = slime.getBoundingClientRect();
+
+      if (pRect.left < sRect.right && pRect.right > sRect.left &&
+          pRect.top < sRect.bottom && pRect.bottom > sRect.top) {
+        score++;
+        scoreText.innerText = "점수: " + score;
+        slime.remove();
+        clearInterval(fall);
+        return;
+      }
+
+      if (slimeY > window.innerHeight) {
+        slime.remove();
+        clearInterval(fall);
+        hpHalf -= 1;
+        updateHearts();
+        if (hpHalf <= 0) gameOver();
+      }
+    }, 20);
+  }
+
+  function spawnStar() {
+    const star = document.createElement("div");
+    star.classList.add("star");
+    star.style.left = Math.random()*(window.innerWidth-30) + "px";
+    document.body.appendChild(star);
+
+    let starY = -50;
+    const fall = setInterval(() => {
+      starY += 3;
+      star.style.top = starY + "px";
+
+      const pRect = player.getBoundingClientRect();
+      const sRect = star.getBoundingClientRect();
+
+      if (pRect.left < sRect.right && pRect.right > sRect.left &&
+          pRect.top < sRect.bottom && pRect.bottom > sRect.top) {
+        hpHalf = Math.min(hpHalf + 1, 10);
+        updateHearts();
+        star.remove();
+        clearInterval(fall);
+        return;
+      }
+
+      if (starY > window.innerHeight) {
+        star.remove();
+        clearInterval(fall);
+      }
+    }, 20);
+  }
+</script>
+
+</body>
+</html>
